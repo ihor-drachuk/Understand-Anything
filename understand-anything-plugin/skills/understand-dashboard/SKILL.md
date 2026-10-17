@@ -49,96 +49,33 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
    fi
    ```
 
-3. Find the dashboard code. The dashboard is at `packages/dashboard/` relative to this plugin's root directory. Check these paths in order and use the first that exists:
-   - `${CLAUDE_PLUGIN_ROOT}/packages/dashboard/` (Claude Code runtime root, highest priority)
-   - `~/.understand-anything-plugin/packages/dashboard/` (universal symlink, all installs)
-   - Two levels up from `~/.agents/skills/understand-dashboard` real path (self-relative fallback)
-   - Two levels up from `~/.copilot/skills/understand-dashboard` real path (Copilot personal skills fallback)
-   - Common clone-based install roots:
-     - `~/.codex/understand-anything/understand-anything-plugin/packages/dashboard/`
-     - `~/.opencode/understand-anything/understand-anything-plugin/packages/dashboard/`
-     - `~/.pi/understand-anything/understand-anything-plugin/packages/dashboard/`
-     - `~/understand-anything/understand-anything-plugin/packages/dashboard/`
+3. Find the bundled viewer. This is a standalone bundle: the viewer and the built dashboard ship prebuilt under `packages/viewer/`, and nothing is downloaded, installed or built at runtime.
 
    Use the Bash tool to resolve:
    ```bash
-   SKILL_REAL=$(realpath ~/.agents/skills/understand-dashboard 2>/dev/null || readlink -f ~/.agents/skills/understand-dashboard 2>/dev/null || echo "")
-   SELF_RELATIVE=$([ -n "$SKILL_REAL" ] && cd "$SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
-   COPILOT_SKILL_REAL=$(realpath ~/.copilot/skills/understand-dashboard 2>/dev/null || readlink -f ~/.copilot/skills/understand-dashboard 2>/dev/null || echo "")
-   COPILOT_SELF_RELATIVE=$([ -n "$COPILOT_SKILL_REAL" ] && cd "$COPILOT_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
-
-   PLUGIN_ROOT=""
-   for candidate in \
-     "${CLAUDE_PLUGIN_ROOT}" \
-     "$HOME/.understand-anything-plugin" \
-     "$SELF_RELATIVE" \
-     "$COPILOT_SELF_RELATIVE" \
-     "$HOME/.codex/understand-anything/understand-anything-plugin" \
-     "$HOME/.opencode/understand-anything/understand-anything-plugin" \
-     "$HOME/.pi/understand-anything/understand-anything-plugin" \
-     "$HOME/understand-anything/understand-anything-plugin"; do
-     if [ -n "$candidate" ] && [ -d "$candidate/packages/dashboard" ]; then
-       PLUGIN_ROOT="$candidate"; break
-     fi
-   done
-
-   if [ -z "$PLUGIN_ROOT" ]; then
-     echo "Error: Cannot find the understand-anything plugin root."
-     echo "Checked:"
-     echo "  - ${CLAUDE_PLUGIN_ROOT:-<unset CLAUDE_PLUGIN_ROOT>}"
-     echo "  - $HOME/.understand-anything-plugin"
-     echo "  - ${SELF_RELATIVE:-<unresolved path derived from ~/.agents/skills/understand-dashboard>}"
-     echo "  - ${COPILOT_SELF_RELATIVE:-<unresolved path derived from ~/.copilot/skills/understand-dashboard>}"
-     echo "  - $HOME/.codex/understand-anything/understand-anything-plugin"
-     echo "  - $HOME/.opencode/understand-anything/understand-anything-plugin"
-     echo "  - $HOME/.pi/understand-anything/understand-anything-plugin"
-     echo "  - $HOME/understand-anything/understand-anything-plugin"
-     echo "Make sure you followed the installation instructions for your platform."
+   VIEWER="${CLAUDE_PLUGIN_ROOT}/packages/viewer/bin/viewer.mjs"
+   if [ ! -f "$VIEWER" ] || [ ! -f "${CLAUDE_PLUGIN_ROOT}/packages/viewer/dist/index.html" ]; then
+     echo "Error: the understand-anything bundle at '${CLAUDE_PLUGIN_ROOT}' has no prebuilt viewer."
+     echo "Reinstall the standalone bundle instead of installing packages into the plugin directory."
      exit 1
    fi
-
-   DASHBOARD_DIR="$PLUGIN_ROOT/packages/dashboard"
    ```
 
-4. **Fast path — try the prebuilt viewer first (no install, no build).** Each release ships a self-contained viewer tarball; run it pinned to the installed plugin version:
+4. Start the viewer:
    ```bash
-   : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
+   : "${VIEWER:?Run step 3 first so VIEWER is set}"
    : "${PROJECT_DIR:?Run step 1 first so PROJECT_DIR is set}"
-   PLUGIN_VERSION=$(node -p "require('$PLUGIN_ROOT/package.json').version")
-   VIEWER_URL="https://github.com/Egonex-AI/Understand-Anything/releases/download/v${PLUGIN_VERSION}/understand-anything-viewer.tgz"
-   npx --yes "$VIEWER_URL" "$PROJECT_DIR"
-   ```
-   Run this in the background. It prints the same `🔑  Dashboard URL` line as the dev server:
-   - If the line appears, **skip steps 5-6** and continue at step 7.
-   - If the process exits without printing it (no release asset for this version, or no network), fall back to steps 5-6.
-
-5. Fallback: install dependencies and build if needed:
-   ```bash
-   : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
-   DASHBOARD_DIR="${DASHBOARD_DIR:-$PLUGIN_ROOT/packages/dashboard}"
-   cd "$DASHBOARD_DIR" && (pnpm install --frozen-lockfile 2>/dev/null || pnpm install)
-   ```
-   Then ensure the core package is built (the dashboard depends on it):
-   ```bash
-   : "${PLUGIN_ROOT:?Run step 3 first so PLUGIN_ROOT is set}"
-   cd "$PLUGIN_ROOT" && pnpm --filter @understand-anything/core build
-   ```
-
-6. Fallback: start the Vite dev server pointing at the project's knowledge graph:
-   ```bash
-   : "${PROJECT_DIR:?Run step 1 first so PROJECT_DIR is set}"
-   : "${DASHBOARD_DIR:?Run step 5 first so DASHBOARD_DIR is set}"
-   cd "$DASHBOARD_DIR" && GRAPH_DIR="$PROJECT_DIR" npx vite --host 127.0.0.1
+   node "$VIEWER" "$PROJECT_DIR"
    ```
    Run this in the background so the user can continue working.
 
-7. **Capture the access token URL from the server output.** The server (viewer or Vite) prints a line like:
+5. **Capture the access token URL from the server output.** The viewer prints a line like:
    ```
    🔑  Dashboard URL: http://127.0.0.1:<PORT>?token=<TOKEN>
    ```
    Extract the full URL including the `?token=` parameter. The token is required to access the knowledge graph data — without it the dashboard will show an "Access Token Required" gate.
 
-8. Report to the user, including the full tokenized URL:
+6. Report to the user, including the full tokenized URL:
    ```
    Dashboard started at http://127.0.0.1:<PORT>?token=<TOKEN>
    Viewing: $UA_DIR/knowledge-graph.json
@@ -149,7 +86,5 @@ Start the Understand Anything dashboard to visualize the knowledge graph for the
 
 ## Notes
 
-- The fast path (step 4) downloads a version-pinned, self-contained viewer from the GitHub release — nothing is installed into the plugin directory and no build runs
-- The dashboard auto-opens in the default browser (both the viewer and Vite's `--open`)
-- If port 5173 is already in use, the next available port is picked (both paths)
-- In the fallback, the `GRAPH_DIR` environment variable tells the dev server where to find the knowledge graph
+- The dashboard auto-opens in the default browser
+- If port 5173 is already in use, the next available port is picked

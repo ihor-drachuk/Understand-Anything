@@ -71,55 +71,17 @@ Determine whether to run a full analysis or incremental update.
      ```
 
      Set `UNDERSTAND_NO_WORKTREE_REDIRECT=1` if you intentionally want a per-worktree graph (rare — most users want the redirect).
-1.5. **Ensure the plugin is built.** Later phases invoke Node scripts that import `@understand-anything/core`. On a fresh install `packages/core/dist/` does not exist yet — build once.
-
-   **Important:** do **not** assume the plugin root is simply two directories above the skill path string. In many installations `~/.agents/skills/understand` is a symlink into the real plugin checkout. Prefer runtime-provided plugin roots first (for Claude), then fall back to universal symlinks, skill symlink resolution, and common clone-based install paths.
-
-   Resolve the plugin root like this:
+1.5. **Check the plugin bundle.** Later phases invoke Node scripts that import `@understand-anything/core`. This is a standalone bundle: `packages/core/dist/` and `node_modules/` ship prebuilt, and nothing is installed or built at runtime.
 
    ```bash
-   SKILL_REAL=$(realpath ~/.agents/skills/understand 2>/dev/null || readlink -f ~/.agents/skills/understand 2>/dev/null || echo "")
-   SELF_RELATIVE=$([ -n "$SKILL_REAL" ] && cd "$SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
-   COPILOT_SKILL_REAL=$(realpath ~/.copilot/skills/understand 2>/dev/null || readlink -f ~/.copilot/skills/understand 2>/dev/null || echo "")
-   COPILOT_SELF_RELATIVE=$([ -n "$COPILOT_SKILL_REAL" ] && cd "$COPILOT_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
-
-   PLUGIN_ROOT=""
-   for candidate in \
-     "${CLAUDE_PLUGIN_ROOT}" \
-     "$HOME/.understand-anything-plugin" \
-     "$SELF_RELATIVE" \
-     "$COPILOT_SELF_RELATIVE" \
-     "$HOME/.codex/understand-anything/understand-anything-plugin" \
-     "$HOME/.opencode/understand-anything/understand-anything-plugin" \
-     "$HOME/.pi/understand-anything/understand-anything-plugin" \
-     "$HOME/understand-anything/understand-anything-plugin"; do
-     if [ -n "$candidate" ] && [ -f "$candidate/package.json" ] && [ -f "$candidate/pnpm-workspace.yaml" ]; then
-       PLUGIN_ROOT="$candidate"
-       break
-     fi
-   done
-
-   if [ -z "$PLUGIN_ROOT" ]; then
-     echo "Error: Cannot find the understand-anything plugin root."
-     echo "Checked:"
-     echo "  - ${CLAUDE_PLUGIN_ROOT:-<unset CLAUDE_PLUGIN_ROOT>}"
-     echo "  - $HOME/.understand-anything-plugin"
-     echo "  - ${SELF_RELATIVE:-<unresolved path derived from ~/.agents/skills/understand>}"
-     echo "  - ${COPILOT_SELF_RELATIVE:-<unresolved path derived from ~/.copilot/skills/understand>}"
-     echo "  - $HOME/.codex/understand-anything/understand-anything-plugin"
-     echo "  - $HOME/.opencode/understand-anything/understand-anything-plugin"
-     echo "  - $HOME/.pi/understand-anything/understand-anything-plugin"
-     echo "  - $HOME/understand-anything/understand-anything-plugin"
-     echo "Make sure the plugin is installed correctly."
+   if [ ! -f "${CLAUDE_PLUGIN_ROOT}/packages/core/dist/index.js" ]; then
+     echo "Error: the understand-anything bundle at '${CLAUDE_PLUGIN_ROOT}' has no packages/core/dist/index.js."
+     echo "Reinstall the standalone bundle instead of installing packages into the plugin directory."
      exit 1
-   fi
-
-   if [ ! -f "$PLUGIN_ROOT/packages/core/dist/index.js" ]; then
-     cd "$PLUGIN_ROOT" && (pnpm install --frozen-lockfile 2>/dev/null || pnpm install) && pnpm --filter @understand-anything/core build
    fi
    ```
 
-   If `pnpm` is missing, report to the user: "Install Node.js ≥ 22 and pnpm ≥ 10, then re-run `/understand`."
+   If the check fails, report the error to the user and **STOP**.
 
 1.7. **Resolve the data directory `$UA_DIR`.** All Understand-Anything artifacts live in the project's data directory. Resolve it once, now that `$PROJECT_ROOT` is known, and reuse `$UA_DIR` for every read and write in later phases:
    ```bash
@@ -173,7 +135,8 @@ Determine whether to run a full analysis or incremental update.
 4. **Check for subdomain knowledge graphs to merge:**
    List all `*knowledge-graph*.json` files in `$UA_DIR/` **excluding** `knowledge-graph.json` itself (e.g. `frontend-knowledge-graph.json`, `backend-knowledge-graph.json`). If any subdomain graphs exist, run the merge script bundled with this skill (located next to this SKILL.md file — use the skill directory path, not the project root):
    ```bash
-   python "<SKILL_DIR>/merge-subdomain-graphs.py" "$PROJECT_ROOT"
+   PY=$(python3 -c '' 2>/dev/null && echo python3 || echo python)
+   "$PY" "<SKILL_DIR>/merge-subdomain-graphs.py" "$PROJECT_ROOT"
    ```
    The script discovers subdomain graphs, loads the existing `knowledge-graph.json` as a base (if present), and merges everything into `knowledge-graph.json` (deduplicating nodes and edges). Report the merge summary to the user, then continue with the merged graph.
 
@@ -242,9 +205,9 @@ Determine whether to run a full analysis or incremental update.
 Set up and verify the `.understandignore` file before a full scan. Incremental preparation already applies the current ignore rules and must skip this confirmation phase.
 
 1. Check if `$UA_DIR/.understandignore` exists.
-2. **If it does NOT exist**, generate a starter file by invoking the bundled script (delegates to `generateStarterIgnoreFile` in `@understand-anything/core`, which reads `.gitignore`, deduplicates against built-in defaults, and emits language-grouped test-file suggestions). Pass `$PLUGIN_ROOT` via the env so the script doesn't have to re-derive it from its own path (which breaks for copied skill installs):
+2. **If it does NOT exist**, generate a starter file by invoking the bundled script (delegates to `generateStarterIgnoreFile` in `@understand-anything/core`, which reads `.gitignore`, deduplicates against built-in defaults, and emits language-grouped test-file suggestions). Pass the plugin root via the env so the script doesn't have to re-derive it from its own path (which breaks for copied skill installs):
      ```bash
-     PLUGIN_ROOT="$PLUGIN_ROOT" node "<SKILL_DIR>/generate-ignore.mjs" "$PROJECT_ROOT"
+     PLUGIN_ROOT="${CLAUDE_PLUGIN_ROOT}" node "<SKILL_DIR>/generate-ignore.mjs" "$PROJECT_ROOT"
      ```
    - Report to the user:
      > Generated `$UA_DIR/.understandignore` with suggested exclusions based on your project structure. Please review it and uncomment any patterns you'd like to exclude from analysis. When ready, confirm to continue.
@@ -282,6 +245,7 @@ Pass these parameters in the dispatch prompt:
 
 > Scan this project directory to discover all project files (including non-code files like configs, docs, infrastructure), detect languages and frameworks.
 > Project root: `$PROJECT_ROOT`
+> Plugin root: `${CLAUDE_PLUGIN_ROOT}`
 > Write output to: `$UA_DIR/intermediate/scan-result.json`
 >
 > Exclude patterns (from --exclude CLI flag; pass to scan-project.mjs via --exclude): $EXCLUDE_PATTERNS
@@ -378,7 +342,8 @@ After ALL batches complete, report to the user: `Phase 2 complete. All <totalBat
 
 Run the merge-and-normalize script bundled with this skill (located next to this SKILL.md file — use the skill directory path, not the project root):
 ```bash
-python "<SKILL_DIR>/merge-batch-graphs.py" "$PROJECT_ROOT"
+PY=$(python3 -c '' 2>/dev/null && echo python3 || echo python)
+"$PY" "<SKILL_DIR>/merge-batch-graphs.py" "$PROJECT_ROOT"
 ```
 
 This script reads all `batch-*.json` files (including `batch-<i>-part-<k>.json` produced by file-analyzers that split their output) from `$UA_DIR/intermediate/`, then in one pass:
@@ -405,7 +370,8 @@ Include the script's warnings in `$PHASE_WARNINGS` for the reviewer.
 3. Run the merge script in both cases:
 
    ```bash
-   python "<SKILL_DIR>/merge-batch-graphs.py" "$PROJECT_ROOT"
+   PY=$(python3 -c '' 2>/dev/null && echo python3 || echo python)
+   "$PY" "<SKILL_DIR>/merge-batch-graphs.py" "$PROJECT_ROOT"
    ```
 
 The merge combines `batch-existing.json` with any fresh batch output. Its import recovery reads the already-refreshed `scan-result.json`, so added and removed imports are reflected during this same run. Require a successful exit as well as `assembled-graph.json` before continuing. A failed merge can deliberately leave an incomplete candidate for diagnosis.

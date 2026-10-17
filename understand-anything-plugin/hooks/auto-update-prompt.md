@@ -14,8 +14,8 @@ Incrementally update the knowledge graph after a commit. Do not ask the user for
 
 2. Require `$UA_DIR/knowledge-graph.json` and `$UA_DIR/meta.json`. If either is missing, report that `/understand` must create a baseline and **STOP**.
 3. Read `gitCommitHash` from meta as `$LAST_COMMIT_HASH`; get `$HEAD_COMMIT` with `git rev-parse HEAD`. If they match, report that the graph is current and **STOP**.
-4. Resolve `$PLUGIN_ROOT` from `$CLAUDE_PLUGIN_ROOT`, then `$HOME/.understand-anything-plugin`, validating that it contains `skills/understand/prepare-incremental.mjs`. If it cannot be found, report the error and **STOP** without changing metadata.
-5. Ensure core is built, then run the bundled helper with parameterized arguments:
+4. Set `$PLUGIN_ROOT` to the plugin directory that contains this file's `hooks/` directory; the hook message gave this file's absolute path. This is a standalone bundle: require `$PLUGIN_ROOT/packages/core/dist/index.js`. If it is missing, report that the bundle is incomplete and **STOP** without changing metadata. Never install or build packages to repair it.
+5. Run the bundled helper with parameterized arguments:
 
    ```bash
    node "$PLUGIN_ROOT/skills/understand/prepare-incremental.mjs" \
@@ -58,7 +58,8 @@ Read `filesToReanalyze` from the plan. It never contains deleted, ignored, cosme
 Run the deterministic merge in both empty and non-empty analyzer cases:
 
 ```bash
-python "$PLUGIN_ROOT/skills/understand/merge-batch-graphs.py" "$PROJECT_ROOT"
+PY=$(python3 -c '' 2>/dev/null && echo python3 || echo python)
+"$PY" "$PLUGIN_ROOT/skills/understand/merge-batch-graphs.py" "$PROJECT_ROOT"
 ```
 
 It combines `batch-existing.json` with fresh batches and recovers imports from the refreshed `scan-result.json`, including `config:`, `schema:`, `service:`, and other valid whole-file nodes. Require both a successful exit and `$UA_DIR/intermediate/assembled-graph.json`; failed candidates remain on disk for diagnosis.

@@ -56,12 +56,13 @@ Invoke the bundled scan script. It walks the project (preferring `git ls-files`,
 
 If the dispatch prompt includes exclude patterns, append `--exclude "<patterns>"` to the invocation (patterns should be comma-separated; the script splits them internally).
 
-Resolve the project's data directory once (the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`) and reuse `$UA_DIR` for every path below:
+Resolve the project's data directory once (the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`) and reuse `$UA_DIR` for every path below. Set `PLUGIN_ROOT` to the plugin root from the dispatch prompt:
 
 ```bash
+PLUGIN_ROOT="<plugin root from the dispatch prompt>"
 UA_DIR="$PROJECT_ROOT/$([ -d "$PROJECT_ROOT/.understand-anything" ] && echo .understand-anything || echo .ua)"
 mkdir -p $UA_DIR/tmp
-node $PLUGIN_ROOT/skills/understand/scan-project.mjs \
+node "$PLUGIN_ROOT/skills/understand/scan-project.mjs" \
   "$PROJECT_ROOT" \
   "$UA_DIR/tmp/ua-scan-files.json"
 ```
@@ -69,7 +70,7 @@ node $PLUGIN_ROOT/skills/understand/scan-project.mjs \
 With exclude patterns (add the `--exclude` flag after the output path):
 
 ```bash
-node $PLUGIN_ROOT/skills/understand/scan-project.mjs \
+node "$PLUGIN_ROOT/skills/understand/scan-project.mjs" \
   "$PROJECT_ROOT" \
   "$UA_DIR/tmp/ua-scan-files.json" \
   --exclude "tests/*,docs/*"
@@ -150,7 +151,8 @@ ENDJSON
 Then run:
 
 ```bash
-node $PLUGIN_ROOT/skills/understand/extract-import-map.mjs \
+PLUGIN_ROOT="<plugin root from the dispatch prompt>"
+node "$PLUGIN_ROOT/skills/understand/extract-import-map.mjs" \
   $UA_DIR/tmp/ua-import-map-input.json \
   $UA_DIR/tmp/ua-import-map-output.json
 ```

@@ -29,8 +29,9 @@ Detection signals: has `index.md` + multiple `.md` files with wikilinks. May hav
    - **Resolve the data directory `$UA_DIR`** once, and reuse it for every read and write below: `UA_DIR="<TARGET_DIR>/$([ -d "<TARGET_DIR>/.understand-anything" ] && echo .understand-anything || echo .ua)"` — this selects the legacy `.understand-anything/` when it already exists, otherwise the new `.ua/`.
 
 2. Run the format detection script bundled with this skill:
-   ```
-   python3 "<SKILL_DIR>/parse-knowledge-base.py" "<TARGET_DIR>"
+   ```bash
+   PY=$(python3 -c '' 2>/dev/null && echo python3 || echo python)
+   "$PY" "<SKILL_DIR>/parse-knowledge-base.py" "<TARGET_DIR>"
    ```
    - If the script exits with an error, tell the user this doesn't appear to be a Karpathy-pattern wiki and explain what was expected
    - If successful, proceed. The script writes `scan-manifest.json` to `$UA_DIR/intermediate/`
@@ -73,8 +74,9 @@ Dispatch `article-analyzer` subagents to extract implicit knowledge:
 ### Phase 4: MERGE
 
 1. Run the merge script bundled with this skill:
-   ```
-   python3 "<SKILL_DIR>/merge-knowledge-graph.py" "<TARGET_DIR>"
+   ```bash
+   PY=$(python3 -c '' 2>/dev/null && echo python3 || echo python)
+   "$PY" "<SKILL_DIR>/merge-knowledge-graph.py" "<TARGET_DIR>"
    ```
 
 2. The script:

@@ -48,49 +48,7 @@ UA_DIR="$PROJECT_ROOT/$([ -d "$PROJECT_ROOT/.understand-anything" ] && echo .und
 ```
 This keeps the legacy `.understand-anything/` directory when it already exists (existing projects keep working with no migration) and uses the new `.ua/` otherwise. Because each phase may run in a fresh shell, carry `$UA_DIR` forward like `$PROJECT_ROOT`, re-resolving it with the line above if a later command block needs it.
 
-**Important:** do **not** assume the plugin root is simply two directories above the skill path string. In many installations `~/.agents/skills/understand-domain` is a symlink into the real plugin checkout. Prefer runtime-provided plugin roots first (for Claude), then fall back to universal symlinks, skill symlink resolution, and common clone-based install paths.
-
-Resolve the plugin root like this:
-
-```bash
-SKILL_REAL=$(realpath ~/.agents/skills/understand-domain 2>/dev/null || readlink -f ~/.agents/skills/understand-domain 2>/dev/null || echo "")
-SELF_RELATIVE=$([ -n "$SKILL_REAL" ] && cd "$SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
-COPILOT_SKILL_REAL=$(realpath ~/.copilot/skills/understand-domain 2>/dev/null || readlink -f ~/.copilot/skills/understand-domain 2>/dev/null || echo "")
-COPILOT_SELF_RELATIVE=$([ -n "$COPILOT_SKILL_REAL" ] && cd "$COPILOT_SKILL_REAL/../.." 2>/dev/null && pwd || echo "")
-
-PLUGIN_ROOT=""
-for candidate in \
-  "${CLAUDE_PLUGIN_ROOT}" \
-  "$HOME/.understand-anything-plugin" \
-  "$SELF_RELATIVE" \
-  "$COPILOT_SELF_RELATIVE" \
-  "$HOME/.codex/understand-anything/understand-anything-plugin" \
-  "$HOME/.opencode/understand-anything/understand-anything-plugin" \
-  "$HOME/.pi/understand-anything/understand-anything-plugin" \
-  "$HOME/understand-anything/understand-anything-plugin"; do
-  if [ -n "$candidate" ] && [ -f "$candidate/package.json" ] && [ -f "$candidate/pnpm-workspace.yaml" ]; then
-    PLUGIN_ROOT="$candidate"
-    break
-  fi
-done
-
-if [ -z "$PLUGIN_ROOT" ]; then
-  echo "Error: Cannot find the understand-anything plugin root."
-  echo "Checked:"
-  echo "  - ${CLAUDE_PLUGIN_ROOT:-<unset CLAUDE_PLUGIN_ROOT>}"
-  echo "  - $HOME/.understand-anything-plugin"
-  echo "  - ${SELF_RELATIVE:-<unresolved path derived from ~/.agents/skills/understand-domain>}"
-  echo "  - ${COPILOT_SELF_RELATIVE:-<unresolved path derived from ~/.copilot/skills/understand-domain>}"
-  echo "  - $HOME/.codex/understand-anything/understand-anything-plugin"
-  echo "  - $HOME/.opencode/understand-anything/understand-anything-plugin"
-  echo "  - $HOME/.pi/understand-anything/understand-anything-plugin"
-  echo "  - $HOME/understand-anything/understand-anything-plugin"
-  echo "Make sure the plugin is installed correctly."
-  exit 1
-fi
-```
-
-Use `$PLUGIN_ROOT` for every reference to agent definitions in subsequent phases.
+The plugin root is `${CLAUDE_PLUGIN_ROOT}`. Use it for every reference to agent definitions in subsequent phases.
 
 ### Phase 1: Detect Existing Graph
 
@@ -117,8 +75,9 @@ Use `$PLUGIN_ROOT` for every reference to agent definitions in subsequent phases
 The preprocessing script does NOT produce a domain graph — it produces **raw material** (file tree, entry points, exports/imports) so the domain-analyzer agent can focus on the actual domain analysis instead of spending dozens of tool calls exploring the codebase. Think of it as a cheat sheet: cheap Python preprocessing → expensive LLM gets a clean, small input → better results for less cost.
 
 1. Run the preprocessing script bundled with this skill, passing `$PROJECT_ROOT` from Phase 0:
-   ```
-   python ./extract-domain-context.py "$PROJECT_ROOT"
+   ```bash
+   PY=$(python3 -c '' 2>/dev/null && echo python3 || echo python)
+   "$PY" "${CLAUDE_SKILL_DIR}/extract-domain-context.py" "$PROJECT_ROOT"
    ```
    This outputs `$UA_DIR/intermediate/domain-context.json` containing:
    - File tree (respecting `.gitignore`)
@@ -142,7 +101,7 @@ The preprocessing script does NOT produce a domain graph — it produces **raw m
 
 ### Phase 4: Domain Analysis
 
-1. Read the domain-analyzer agent prompt from `$PLUGIN_ROOT/agents/domain-analyzer.md`
+1. Read the domain-analyzer agent prompt from `${CLAUDE_PLUGIN_ROOT}/agents/domain-analyzer.md`
 2. Dispatch a subagent with the domain-analyzer prompt + the context from Phase 2 or 3
 3. The agent writes its output to `$UA_DIR/intermediate/domain-analysis.json`
 
