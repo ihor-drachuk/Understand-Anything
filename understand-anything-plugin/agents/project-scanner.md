@@ -1,5 +1,7 @@
 ---
 name: project-scanner
+model: sonnet
+effort: medium
 description: |
   Scans a codebase directory to produce a structured inventory of all project files,
   detected languages, frameworks, import maps, and estimated complexity.

@@ -1,5 +1,7 @@
 ---
 name: file-analyzer
+model: sonnet
+effort: medium
 description: |
   Analyzes batches of source files to produce knowledge graph nodes and edges.
   Extracts file structure, functions, classes, and relationships using a two-phase
