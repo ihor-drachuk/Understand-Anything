@@ -15,11 +15,13 @@ The `standalone` branch builds the plugin into a folder that runs without networ
 
 ## Install
 
-1. Download one release archive and `SHA256SUMS`, then check them: `sha256sum -c --ignore-missing SHA256SUMS` (on macOS `shasum -a 256 -c --ignore-missing SHA256SUMS`) and `gh attestation verify <archive> --repo ihor-drachuk/Understand-Anything`.
-2. Extract `understand-anything-plugin/` into a local marketplace directory and add `{ "name": "understand-anything", "source": "./understand-anything-plugin" }` to the `plugins` array of that marketplace's `marketplace.json`.
-3. Run `claude plugin install understand-anything@<marketplace-name>`.
+1. Download one release archive and `SHA256SUMS`, then check them: `sha256sum -c --ignore-missing SHA256SUMS` (on macOS `shasum -a 256 -c --ignore-missing SHA256SUMS`) and `gh attestation verify <archive> --repo ihor-drachuk/3rd-understand-anything`.
+2. Extract `3rd-understand-anything/` into a local marketplace directory and add `{ "name": "3rd-understand-anything", "source": "./3rd-understand-anything" }` to the `plugins` array of that marketplace's `marketplace.json`.
+3. Run `claude plugin install 3rd-understand-anything@<marketplace-name>`.
 
-To check an installed copy, run `sha256sum -c SHA256SUMS` inside `understand-anything-plugin/`. `BUILD-INFO.json` names the upstream commit, the build commit and the workflow run.
+The bundle's `plugin.json` takes its `name` from the bundle folder, which `PLUGIN_NAME` in the workflow sets. Upstream's `understand-anything-plugin/.claude-plugin/plugin.json` keeps the upstream name.
+
+To check an installed copy, run `sha256sum -c SHA256SUMS` inside `3rd-understand-anything/`. `BUILD-INFO.json` names the upstream commit, the build commit and the workflow run.
 
 ## Update to a newer upstream
 

@@ -20,6 +20,8 @@ defaults:
 env:
   # BUILD-INFO.json records this upstream commit, so we update it after every rebase.
   UPSTREAM_BASE: f2d0164f72fe678805c34245a6df36acededfebd
+  # assemble.mjs names the plugin after its bundle folder, so we set the folder, plugin and archive name only here.
+  PLUGIN_NAME: 3rd-understand-anything
 
 jobs:
   build:
@@ -51,17 +53,17 @@ jobs:
         run: pnpm --filter @understand-anything/core --fail-if-no-match test
 
       - name: Assemble bundle
-        run: node scripts/standalone/assemble.mjs . "$RUNNER_TEMP/bundle/understand-anything-plugin"
+        run: node scripts/standalone/assemble.mjs . "$RUNNER_TEMP/bundle/$PLUGIN_NAME"
 
       - name: Pack bundle
         id: pack
         run: |
           version=$(node -p "require('./understand-anything-plugin/package.json').version")
-          name="understand-anything-standalone-${version}-${GITHUB_SHA::7}"
+          name="${PLUGIN_NAME}-${version}-${GITHUB_SHA::7}"
           echo "name=$name" >> "$GITHUB_OUTPUT"
           mkdir dist-standalone
-          tar -C "$RUNNER_TEMP/bundle" -czf "dist-standalone/$name.tar.gz" understand-anything-plugin
-          (cd "$RUNNER_TEMP/bundle" && zip -qrX "$GITHUB_WORKSPACE/dist-standalone/$name.zip" understand-anything-plugin)
+          tar -C "$RUNNER_TEMP/bundle" -czf "dist-standalone/$name.tar.gz" "$PLUGIN_NAME"
+          (cd "$RUNNER_TEMP/bundle" && zip -qrX "$GITHUB_WORKSPACE/dist-standalone/$name.zip" "$PLUGIN_NAME")
           (cd dist-standalone && sha256sum -- * > SHA256SUMS && cat SHA256SUMS)
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -143,11 +145,11 @@ jobs:
         run: >
           sudo unshare --net sh -c 'ip link set lo up &&
           exec sudo -u "$1" env PATH="$2" HOME="$3" node scripts/standalone/smoke.mjs "$4"'
-          sh "$(id -un)" "$PATH" "$HOME" "$RUNNER_TEMP/iso/understand-anything-plugin"
+          sh "$(id -un)" "$PATH" "$HOME" "$RUNNER_TEMP/iso/$PLUGIN_NAME"
 
       - name: Smoke test
         if: runner.os != 'Linux'
-        run: node scripts/standalone/smoke.mjs "$RUNNER_TEMP/iso/understand-anything-plugin"
+        run: node scripts/standalone/smoke.mjs "$RUNNER_TEMP/iso/$PLUGIN_NAME"
 
   release:
     if: startsWith(github.ref, 'refs/tags/standalone-v')

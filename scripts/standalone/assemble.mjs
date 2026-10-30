@@ -6,15 +6,16 @@
  *   node scripts/standalone/assemble.mjs <repo-root> <bundle-dir>
  *
  * Expects core and viewer to be built already (see .github/workflows/standalone.yml).
- * Copies the tracked plugin files plus build outputs into <bundle-dir>, installs
- * production dependencies offline from the plugin lockfile, replaces every
- * symlink with a real copy, and writes BUILD-INFO.json and SHA256SUMS.
+ * Copies the tracked plugin files plus build outputs into <bundle-dir>, names the
+ * plugin after the <bundle-dir> folder, installs production dependencies offline
+ * from the plugin lockfile, replaces every symlink with a real copy, and writes
+ * BUILD-INFO.json and SHA256SUMS.
  */
 
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { cpSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 
 const [repoArg, bundleArg] = process.argv.slice(2);
 if (!repoArg || !bundleArg) {
@@ -59,6 +60,11 @@ for (const relPath of tracked) {
 for (const output of BUILD_OUTPUTS) {
   cpSync(join(plugin, output), join(bundle, output), { recursive: true });
 }
+
+// We name the plugin after its folder, otherwise the folder and the installed plugin could carry different names.
+const manifestPath = join(bundle, ".claude-plugin", "plugin.json");
+const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+writeFileSync(manifestPath, `${JSON.stringify({ ...manifest, name: basename(bundle) }, null, 2)}\n`);
 
 // We install with the hoisted layout, because it keeps packages as real directories that survive copying and archiving.
 sh("pnpm", [

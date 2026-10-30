@@ -22,7 +22,7 @@ import {
 } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 
 const bundleArg = process.argv[2];
@@ -93,6 +93,9 @@ function checkIntegrity() {
   const npmLockfiles = ["package-lock.json", "npm-shrinkwrap.json", "bun.lock"]
     .filter((name) => existsSync(join(bundle, name)));
   check(npmLockfiles.length === 0, `bundle root has no npm or bun lockfile (${npmLockfiles.join(", ")})`);
+
+  const { name } = JSON.parse(readFileSync(join(bundle, ".claude-plugin", "plugin.json"), "utf-8"));
+  check(name === basename(bundle), `plugin.json names the plugin after its folder (${name})`);
 
   const sums = readFileSync(join(bundle, "SHA256SUMS"), "utf-8").trim().split("\n");
   const listed = new Set();
